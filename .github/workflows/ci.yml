@@ -1,0 +1,58 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ${{ matrix.so }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        so: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # A transformada pela DEFINICAO e o juiz: sem truque, sem recursao, sem
+      # embaralho de indice, e lenta de proposito, com cada linha sendo a
+      # formula copiada do papel. Toda implementacao rapida daqui e conferida
+      # contra ela, em todo tamanho.
+      #
+      # Isso importa porque as transformadas rapidas erram de um jeito
+      # TRAICOEIRO. Um expoente com sinal trocado, uma ordem de bits invertida
+      # na direcao errada ou um fator de escala fora do lugar produzem uma saida
+      # com o mesmo tamanho, os mesmos modulos e a mesma cara de espectro.
+      # Nenhum teste de "parece certo" pega isso, e por isso os testes conferem
+      # VALOR e nao modulo.
+      #
+      # E ha um segundo juiz, exato: a transformada em aritmetica inteira
+      # modulo 998244353. Ela nao usa um unico numero de ponto flutuante, e e
+      # contra ela que a pergunta "a transformada complexa errou quanto?" tem
+      # resposta.
+      - name: testes
+        run: dotnet test testes/Fourier.Testes/Fourier.Testes.csproj -c Release --nologo -v q
+
+      # As medidas rodam para REGISTRAR numeros: contagem de multiplicacoes e
+      # erro medido, nunca relogio.
+      - name: multiplicacoes, definicao contra rapida
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- custo
+
+      - name: o erro de ida e volta das duas
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- erro
+
+      - name: ate onde o ponto flutuante aguenta na convolucao inteira
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- precisao
+
+      - name: tamanho que nao e potencia de dois
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- tamanho
+
+      - name: o vazamento espectral
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- vazamento
